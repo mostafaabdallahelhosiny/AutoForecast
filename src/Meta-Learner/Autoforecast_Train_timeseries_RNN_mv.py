@@ -1,0 +1,730 @@
+import pandas as pd
+import os
+import simplejson as json
+import csv
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import defaultdict
+from sklearn.cluster import KMeans
+from sklearn.neighbors import NearestNeighbors
+import sklearn
+from sklearn import preprocessing
+from numpy import inf
+from sklearn.decomposition import PCA
+import numpy as np
+import matplotlib.pyplot as plt
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import LSTM
+from tensorflow.keras.layers import Dropout
+import time
+
+# linear regression for multioutput regression
+from sklearn.datasets import make_regression
+from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Ridge 
+
+## Calculating Average. value of a list
+def Average_val(lst):
+    return sum(lst) / len(lst)
+
+## Normalizing feature vectors
+def Normalize_feature(feat_df, PCA_option):  
+    if PCA_option == 'No':
+        x = feat_df #.values 
+    else:
+        x = feat_df    
+    min_max_scaler = preprocessing.MinMaxScaler()
+    x_scaled = min_max_scaler.fit_transform(x)
+    res = pd.DataFrame(x_scaled)
+    
+    return res
+
+### Check about empty files of a directory 
+def Check_Empty_Files(dirName):
+    
+    # Create a List    
+    listOfEmptyDirs = list()
+
+    # Iterate over the directory tree and check if directory is empty.
+    for (dirpath, dirnames, filenames) in os.walk(dirName):
+        if len(dirnames) == 0 and len(filenames) == 0 :
+            listOfEmptyDirs.append(dirpath)
+
+### Get Meta-Features matrix for the training and testing 
+def Get_Meta_Features (meta_feat_dir, data_list, data_type):
+    
+    df_meta_feat = pd.DataFrame()
+    
+    if data_type == 'Uni-var':
+        
+        for file_name in data_list:
+            print(file_name)
+            df = pd.read_csv(meta_feat_dir + file_name +'.csv', error_bad_lines=False, header  = None)
+            last_row = df.tail(1)
+            df_meta_feat = df_meta_feat.append(last_row, ignore_index=True)
+            df_meta_feat = df_meta_feat.fillna(0)
+            
+    
+    return df_meta_feat
+
+    '''
+               else:      
+                   for file_name in all_datasets_list:
+                      cnt = 0
+                      results_vec = []
+                      if '.DS_Store' not in file_name:
+                          cnt += 1
+                          all_models_list = os.listdir(win_res_dir_name + '/' + dir_name + '/' + file_name) 
+                                
+                      
+                          for model_name in all_models_list:
+                              df = pd.read_csv(win_res_dir_name + '/' + dir_name+'/'+file_name+'/'+model_name, error_bad_lines=False, header  = None)
+                              results_vec.append(df.iloc[0,-1])
+                      
+                          best_model_dataset_index = results_vec.index(min(results_vec))
+                          print(file_name + ':' + arr_models[best_model_dataset_index + 1])
+                      
+                          ## Append Best Model for each dataset variable to the vector
+                          a.append(best_model_dataset_index + 1)
+                      
+                          results_vec.insert(0,dir_name+'_'+file_name)
+                      
+                          numpy_perf_vec = np.array(results_vec).reshape((1, len(all_models_list)+1))    
+                          numpy_perf_list = numpy_perf_vec.tolist()
+                      
+                          wtr_perf.writerow (numpy_perf_list)
+    
+    return a    
+'''    
+   
+### Get the best model for specific dataset (Used for ALgros baseline)
+def Get_All_Model_Dataset(data_name, win_res_dir_name, data_type):
+    
+    arr_models = os.listdir(win_res_dir_name + '/' + data_name)
+    
+    all_models_list = os.listdir(win_res_dir_name + '/' + data_name) 
+     
+    results_vec_mse = []
+    results_vec_mape = []
+    results_vec_smape = []
+    for model_name in all_models_list:
+        df = pd.read_csv(win_res_dir_name + '/' + data_name+'/'+ model_name, error_bad_lines=False, header  = None)
+        results_vec_mse.append(df.iloc[0,-1])
+        results_vec_mape.append(df.iloc[1,-1])
+        results_vec_smape.append(df.iloc[2,-1]) 
+    
+    
+    return results_vec_mse, results_vec_mape, results_vec_smape, arr_models
+        
+### (a) Gloal Best Implementation
+def Global_Best (dir_list, data_list, data_type):
+    Models_Array_mse = [] 
+    Models_Array_mape = []
+    Models_Array_smape = []  
+    for data_name in data_list:
+        for win_ind in os.listdir(dir_list):
+            if '.DS_Store' not in win_ind:
+                    print(data_name)
+                    ##### Get Performance Matrix and Best Model Array for both Multi-variate and Uni-variate Datasets with a specific window
+                    if data_type == 'Uni-var':
+                            results_vec_mse = []
+                            results_vec_mape = []
+                            results_vec_smape = []
+                            
+                            all_models_list = os.listdir(dir_list + win_ind + '/' + data_name)  
+                            for model_name in all_models_list:
+                                df = pd.read_csv(dir_list + win_ind + '/' + data_name + '/' + model_name, error_bad_lines=False, header  = None)
+                                results_vec_mse.append(df.iloc[0,-1])
+                                results_vec_mape.append(df.iloc[1,-1])
+                                results_vec_smape.append(df.iloc[2,-1])
+                
+                            best_model_dataset_index_mse = results_vec_mse.index(min(results_vec_mse))
+                            best_model_dataset_index_mape = results_vec_mape.index(min(results_vec_mape))
+                            best_model_dataset_index_smape = results_vec_smape.index(min(results_vec_smape))
+                            
+                            
+                            ## Append Best Model for each dataset variable to the vector
+                            Models_Array_mse.append(best_model_dataset_index_mse)
+                            Models_Array_mape.append(best_model_dataset_index_mape)
+                            Models_Array_smape.append(best_model_dataset_index_smape)
+
+           
+    d_mse = defaultdict(int)
+    for i in Models_Array_mse:
+        d_mse[i] += 1
+    result_mse = max(d_mse.items(), key=lambda x: x[1])
+    
+    d_mape = defaultdict(int)
+    for i in Models_Array_mape:
+        d_mape[i] += 1
+    result_mape = max(d_mape.items(), key=lambda x: x[1])
+    
+    d_smape = defaultdict(int)
+    for i in Models_Array_smape:
+        d_smape[i] += 1
+    result_smape = max(d_smape.items(), key=lambda x: x[1])
+    
+    return all_models_list[result_mse[0]], all_models_list[result_mape[0]], all_models_list[result_smape[0]]
+    
+### Get Average Performance of Models across dataset cluster (Used for ISAC baseline)
+def Get_Best_Avg_Model_Dataset(data_cluster, win_res_dir_name, data_type):
+    
+    results_vec_mse_avg = [0] * 322
+    results_vec_mape_avg = [0] * 322
+    results_vec_smape_avg = [0] * 322
+    
+    for data_name in data_cluster:
+        
+        results_vec_mse = []
+        results_vec_mape = []
+        results_vec_smape = []
+        
+        arr_models = os.listdir(win_res_dir_name + '/' + data_name)
+        all_models_list = os.listdir(win_res_dir_name + '/' + data_name) 
+    
+        for model_name in all_models_list:
+            df = pd.read_csv(win_res_dir_name + '/' + data_name+'/'+ model_name, error_bad_lines=False, header  = None)
+            
+            results_vec_mse.append(df.iloc[0,-1])
+            results_vec_mape.append(df.iloc[1,-1])
+            results_vec_smape.append(df.iloc[2,-1]) 
+        
+        results_vec_mse_avg  += results_vec_mse
+        results_vec_mape_avg  += results_vec_mape
+        results_vec_smape_avg  += results_vec_smape    
+    
+    best_model_dataset_index_mse_avg = results_vec_mse_avg.index(min(results_vec_mse_avg))
+    best_model_dataset_index_mape_avg = results_vec_mape_avg.index(min(results_vec_mape_avg))
+    best_model_dataset_index_smape_avg = results_vec_smape_avg.index(min(results_vec_smape_avg))
+    
+    
+    return arr_models[best_model_dataset_index_mse_avg], arr_models[best_model_dataset_index_mape_avg], arr_models[best_model_dataset_index_smape_avg] 
+
+### Get the best model for specific dataset (Used for ALgros baseline)
+def Get_Best_Model_Dataset(data_name, win_res_dir_name, data_type):
+    
+    arr_models = os.listdir(win_res_dir_name + '/' + data_name)
+    arr_models.insert(0,'Dataset')
+    
+    all_models_list = os.listdir(win_res_dir_name + '/' + data_name) 
+    
+     
+    results_vec_mse = []
+    results_vec_mape = []
+    results_vec_smape = []
+    for model_name in all_models_list:
+        df = pd.read_csv(win_res_dir_name + '/' + data_name+'/'+ model_name, error_bad_lines=False, header  = None)
+        results_vec_mse.append(df.iloc[0,-1])
+        results_vec_mape.append(df.iloc[1,-1])
+        results_vec_smape.append(df.iloc[2,-1]) 
+    
+    
+    best_model_dataset_index_mse = results_vec_mse.index(min(results_vec_mse))
+    best_model_dataset_index_mape = results_vec_mape.index(min(results_vec_mape))
+    best_model_dataset_index_smape = results_vec_smape.index(min(results_vec_smape))
+    
+    
+    return arr_models[best_model_dataset_index_mse + 1], arr_models[best_model_dataset_index_mape + 1], arr_models[best_model_dataset_index_smape + 1]
+    
+#### Get Model Files list from a dataset directory
+def Get_Model_Files_List(win_res_dir_name, data_type):
+    
+    dir_datasets_name = os.listdir(win_res_dir_name)   
+    for dir_name in dir_datasets_name:
+     
+           if '.DS_Store' in dir_name:
+               continue
+           
+           if data_type == 'Uni-var':
+                all_models_list = os.listdir(win_res_dir_name+'/'+dir_name)
+           
+           else:
+               all_datasets_list = os.listdir(win_res_dir_name+'/'+dir_name) 
+           
+               for file_name in all_datasets_list:
+                  if '.DS_Store' not in file_name:
+                      all_models_list = os.listdir(win_res_dir_name+'/'+dir_name+'/'+file_name) 
+                      
+                         
+    return all_models_list 
+
+#### Draw and Save Histogram for the best models
+def Histogram_plot_save(window_best_models_arr):
+    
+    _ = plt.hist(window_best_models_arr, bins= 'auto', density = True)  # arguments are passed to np.histogram
+    plt.title("Histogram of Best Models for Training Dataset", fontsize=12)
+    plt.xlabel("Forecasting Model Index", fontsize=12)
+    plt.ylabel("Probability of being Best Model", fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.tick_params(axis='both', which='minor', labelsize=12)
+    plt.savefig('hist_best_models.eps', format='eps')
+    plt.show()
+    
+def chunks(l, n):
+        n = max(1, n)
+        return [l[i:i+n] for i in range(0, len(l), n)]
+
+### Get Difference between two lists
+def Diff(li1, li2): 
+        return (list(set(li1) - set(li2)))
+
+#### Divide the datasets into 5 folds for training and testing 
+def Divide_Dataset_Folds(n_folds, datasets_dir_list):
+    
+    train_folds_list = []
+    test_folds_list = []
+
+    length = int(len(datasets_dir_list)/ n_folds) #length of each fold
+    folds = []
+    for i in range(n_folds-1):
+        folds += [datasets_dir_list[i*length:(i+1)*length]]
+    folds += [datasets_dir_list[4*length:len(datasets_dir_list)]]
+    
+    print(folds)
+    
+    for fold in folds:        
+        train_folds_list.append(Diff(datasets_dir_list, fold))
+        test_folds_list.append(fold)
+
+
+    return train_folds_list, test_folds_list    
+        
+
+if __name__ == '__main__':
+    
+    n_folds = 5
+    PCA_option = 'Yes' #Yes
+    n_components = 3 ## If PCA_option is Yes, the n_components
+    
+    ## Folds for MV datasets
+    mv_dir_1 = 'results_all_mv/Multi-variate_first_win/'
+    mv_dir_2 = 'results_all_mv/Multi-variate_second_win'
+    mv_dir_3 = 'results_all_mv/Multi-variate_third_win'
+    dir_mv_list = os.listdir(mv_dir_1)
+    dir_mv_list.remove('.DS_Store')
+    train_folds_list_mv, test_folds_list_mv = Divide_Dataset_Folds(n_folds, dir_mv_list) ## Division of folds by dataset names
+      
+  
+    #### Go across the folds and evaluate the different baselines and then average
+    meta_feat_dir_1 = 'Meta-Features/Meta-Feat_first_win/Multi_Variate_Real_first_win/'
+    meta_feat_dir_2 = 'Meta-Features/Meta-Feat_sec_win/Multi_Variate_Real_sec_win/'
+    meta_feat_dir_3 = 'Meta-Features/Meta-Feat_third_win/Multi_Variate_Real_third_win/'
+    
+   
+    final_vec_all_folds = []
+    cnt_k_all = 0
+    train_time_vec = []
+    
+    for i in range(0, n_folds):
+        
+         
+        train_X_mse = pd.DataFrame()
+        test_X_mse = pd.DataFrame()
+        train_Y_mse = pd.DataFrame()
+        test_Y_mse = pd.DataFrame()
+        predicted_mse = pd.DataFrame()
+        
+        train_Y_mape = []; train_Y_smape = []
+        
+        ### Extract Meta-Features
+        ## (1) Train Meta-features
+        meta_features_train_orig_1 = Get_Meta_Features (meta_feat_dir_1, train_folds_list_mv[i], 'Uni-var')
+        meta_features_train_orig_2 = Get_Meta_Features (meta_feat_dir_2, train_folds_list_mv[i], 'Uni-var')
+        meta_features_train_orig_3 = Get_Meta_Features (meta_feat_dir_3, train_folds_list_mv[i], 'Uni-var')
+        
+        meta_features_train_orig_par = meta_features_train_orig_1.append(meta_features_train_orig_2, ignore_index=True)
+        meta_features_train_orig = meta_features_train_orig_par.append(meta_features_train_orig_3, ignore_index=True)
+        
+        ## Perform PCA for Training
+        pca = PCA(n_components)
+        pca.fit(meta_features_train_orig)
+        meta_features_train_pca = pca.transform(meta_features_train_orig)
+        #print(pca.explained_variance_ratio_)
+        
+        #print(meta_features_train_orig)
+        #print(meta_features_train_pca)
+        
+        ## Normalize Features
+        if PCA_option == 'No':
+             meta_features_train = Normalize_feature(meta_features_train_orig, PCA_option)
+        else:     
+             meta_features_train = Normalize_feature(meta_features_train_pca, PCA_option)
+ 
+        print('Normalized Train Features')
+        print(meta_features_train)
+        
+        ## (1) Test Meta-features
+        meta_features_test_orig_1 = Get_Meta_Features (meta_feat_dir_1, test_folds_list_mv[i], 'Uni-var')
+        meta_features_test_orig_2 = Get_Meta_Features (meta_feat_dir_2, test_folds_list_mv[i], 'Uni-var')
+        meta_features_test_orig_3 = Get_Meta_Features (meta_feat_dir_3, test_folds_list_mv[i], 'Uni-var')
+        
+        meta_features_test_orig_par = meta_features_test_orig_1.append(meta_features_test_orig_2, ignore_index=True)
+        meta_features_test_orig = meta_features_test_orig_par.append(meta_features_test_orig_3, ignore_index=True)
+        
+        ## Perform PCA for Testing
+        pca = PCA(n_components)
+        pca.fit(meta_features_test_orig)
+        meta_features_test_pca = pca.transform(meta_features_test_orig)
+        #print(pca.explained_variance_ratio_)
+        
+        ## Normalize Features
+        if PCA_option == 'No':
+             meta_features_test = Normalize_feature(meta_features_test_orig, PCA_option)
+        else:     
+             meta_features_test = Normalize_feature(meta_features_test_pca, PCA_option)
+ 
+        print('Normalized Test Features')    
+        print(meta_features_test)
+        
+                       
+        ## (B) Time-Series Meta-learner 
+        j = 0
+        for train_data_name in train_folds_list_mv[i]: ## Append all of the first window performances 
+        
+            train_X_mse_1 = [];train_X_mse_2 = [];train_X_mse_3 = []; 
+            train_Y_mse_1 = []; train_Y_mse_2 = [];train_Y_mse_3 = [];
+            
+             
+            ## Collect Performances for that dataset
+            results_vec_mse_1, results_vec_mape_1, results_vec_smape_1, arr_models = Get_All_Model_Dataset(train_data_name, mv_dir_1, 'Uni-var')
+            results_vec_mse_2, results_vec_mape_2, results_vec_smape_2, arr_models = Get_All_Model_Dataset(train_data_name, mv_dir_2, 'Uni-var')
+            results_vec_mse_3, results_vec_mape_3, results_vec_smape_3, arr_models = Get_All_Model_Dataset(train_data_name, mv_dir_3, 'Uni-var') 
+            
+          
+            ## First Window History features and performances
+            train_X_mse_1.extend(meta_features_train.iloc[j,:])
+            train_X_mse_1.extend([0] * 322)
+            if PCA_option == 'No':
+                train_X_mse_1.extend([0] * meta_features_train_orig_2.shape[1])
+            else:
+                train_X_mse_1.extend([0] * n_components)
+            train_X_mse_1.extend([0] * 322)
+            print('TRAIN_X After first window')
+            #print(len(train_X_mse_1))
+            
+            a_series = pd.Series(train_X_mse_1)
+            train_X_mse = train_X_mse.append(a_series, ignore_index=True)
+            #print(train_X_mse)
+            
+            print('TRAIN_Y After first window')
+            train_Y_mse_1.extend(results_vec_mse_1)
+            #print(len(train_Y_mse_1))
+            
+            ## Appending the first raw to the train_Y dataframe 
+            a_series = pd.Series(train_Y_mse_1)
+            train_Y_mse = train_Y_mse.append(a_series, ignore_index=True)
+            #print(train_Y_mse)
+            
+            
+            ## Second Window History features and performances
+            train_X_mse_2.extend(meta_features_train.iloc[j,:])
+            train_X_mse_2.extend(results_vec_mse_1)
+            if PCA_option == 'No':
+                train_X_mse_2.extend([0] * meta_features_train_orig_2.shape[1])
+            else:
+                train_X_mse_2.extend([0] * n_components)
+            train_X_mse_2.extend([0] * 322) 
+            print('TRAIN_X After second window')
+            #print(len(train_X_mse_2))
+            
+            a_series = pd.Series(train_X_mse_2)
+            train_X_mse = train_X_mse.append(a_series, ignore_index=True)
+            #print(train_X_mse)
+            
+            ## Appending the second raw to the train_X dataframe 
+            train_Y_mse_2.extend(results_vec_mse_2)
+            print('TRAIN_Y After second window')
+            #print(len(train_Y_mse_2))
+            
+            a_series = pd.Series(train_Y_mse_2)
+            train_Y_mse = train_Y_mse.append(a_series, ignore_index=True)
+            #print(train_Y_mse)
+            
+            
+            ## Third Window History features and performances
+            train_X_mse_3.extend(meta_features_train.iloc[j,:])
+            train_X_mse_3.extend(results_vec_mse_1)
+            train_X_mse_3.extend(meta_features_train.iloc[j+ len(train_folds_list_mv[i]),:])
+            train_X_mse_3.extend(results_vec_mse_2)
+            print('TRAIN_X After third window')
+            #print(len(train_X_mse_3))
+            
+            ## Appending the third raw to the train_X dataframe            
+            a_series = pd.Series(train_X_mse_3)
+            train_X_mse = train_X_mse.append(a_series, ignore_index=True)
+            print(train_X_mse)
+            
+            
+            ## Appending the third raw to the train_Y dataframe 
+            train_Y_mse_3.extend(results_vec_mse_3)
+            print('TRAIN_Y After third window')
+            #print(len(train_Y_mse_3))
+            
+            a_series = pd.Series(train_Y_mse_3)
+            train_Y_mse = train_Y_mse.append(a_series, ignore_index=True)
+            print(train_Y_mse)
+                        
+            j += 1
+            
+            
+        print(train_X_mse)
+         
+        print(train_Y_mse) 
+        
+        # Fit Model for MSE Performance Metric 
+        #model_ts_mse = LinearRegression(positive = True) ## normalize = True 
+        #model_ts_mse = Ridge(alpha = 1.0)
+        
+        ## Start Time for Training
+        start_time = time.time()
+        
+        train_X_mse = train_X_mse.fillna(train_X_mse.mean()) #train_X_mse.mean()
+        train_Y_mse = train_Y_mse.fillna(train_Y_mse.mean()) #train_Y_mse.mean()
+        
+        
+        ## Creating RNN to model TS model
+        train_X_mse = np.array(train_X_mse)
+        train_X_mse = np.reshape(train_X_mse, (train_X_mse.shape[0], train_X_mse.shape[1], 1))                                  
+        model_ts_mse = Sequential()
+        print(train_X_mse.shape[1])
+        model_ts_mse.add(LSTM(units = 50, return_sequences = True, input_shape = (train_X_mse.shape[1], 1)))
+        model_ts_mse.add(Dropout(0.2)) ## Drop Out Regularization
+        ## Adding Three More LSTM Layers
+        for p in [True, True, True, False]:
+            model_ts_mse.add(LSTM(units = 50, return_sequences = p))
+            model_ts_mse.add(Dropout(0.2))
+         
+        ## Adding the output layer
+        print(train_Y_mse.shape[1])    
+        model_ts_mse.add(Dense(units = train_Y_mse.shape[1]))
+        
+        ## Compiling the LSTM
+        model_ts_mse.compile(optimizer = 'adam', loss = 'mean_squared_error')
+        
+        AFY_train_time_seconds = time.time() - start_time 
+        print('AF-Y Train Time: '+ str(AFY_train_time_seconds))
+        
+        train_time_vec.append(AFY_train_time_seconds) 
+        
+        print('Train_Time_Vector_After_Fold ' + str(i))
+        print(train_time_vec)
+        
+        
+        ## Filling NAN with avergae values
+        print(train_X_mse)
+        print(train_Y_mse)
+        
+       
+        
+        ## Fitting the LSTM
+        model_ts_mse.fit(train_X_mse, train_Y_mse, epochs = 50, batch_size = 50)
+        
+        #break
+        
+        #model_ts_mse.fit(train_X_mse, train_Y_mse)
+        #print(model_ts_mse.coef_)
+        #print(model_ts_mse.score(train_X_mse, train_Y_mse))
+        
+        
+        ## Start Time for Inference
+        start_time = time.time()
+        
+        ## Testing of Time-Series Meta-learner 
+        j = 0
+        for test_data_name in test_folds_list_mv[i]: ## Append all of the first window performances 
+        
+            test_X_mse_1 = [];test_X_mse_2 = [];test_X_mse_3 = [];     
+            test_Y_mse_1 = [];test_Y_mse_2 = [];test_Y_mse_3 = []; ## Actual Performances (Ground Truth)
+            
+         
+            ## Collect Performances for that dataset
+            results_vec_mse_1, results_vec_mape_1, results_vec_smape_1, arr_models = Get_All_Model_Dataset(test_data_name, mv_dir_1, 'Uni-var')
+            results_vec_mse_2, results_vec_mape_2, results_vec_smape_2, arr_models = Get_All_Model_Dataset(test_data_name, mv_dir_2, 'Uni-var')
+            results_vec_mse_3, results_vec_mape_3, results_vec_smape_3, arr_models = Get_All_Model_Dataset(test_data_name, mv_dir_3, 'Uni-var') 
+            
+          
+            ## First Window History features and performances
+            test_X_mse_1.extend(meta_features_test.iloc[j,:])
+            test_X_mse_1.extend([0] * 322)
+            if PCA_option == 'No':
+                test_X_mse_1.extend([0] * meta_features_test_orig_2.shape[1])
+            else:
+                test_X_mse_1.extend([0] * n_components)
+            
+            test_X_mse_1.extend([0] * 322)
+            
+            a_series = pd.Series(test_X_mse_1)
+            test_X_mse = test_X_mse.append(a_series, ignore_index=True)
+            
+            ## Ground Truth of the first window
+            test_Y_mse_1.extend(results_vec_mse_1)
+            a_series = pd.Series(test_Y_mse_1)
+            test_Y_mse = test_Y_mse.append(a_series, ignore_index=True)
+            
+            ## Predict the First window performances
+            #print(test_X_mse_1)
+            #test_X_mse_1 = np.array(test_X_mse_1)
+            #test_X_mse_1 = np.reshape(test_X_mse_1, (test_X_mse_1.shape[0], test_X_mse_1.shape[1], 1))
+            
+            #predicted_win_1 = model_ts_mse.predict([test_X_mse_1])
+
+            #a_series = pd.Series(predicted_win_1[0])
+            #predicted_mse = predicted_mse.append(a_series, ignore_index=True)
+            
+            ## Second Window History features and performances
+            test_X_mse_2.extend(meta_features_test.iloc[j,:])
+            #test_X_mse_2.extend(predicted_win_1[0])
+            
+            test_X_mse_2.extend(results_vec_mse_1)
+            if PCA_option == 'No':
+                test_X_mse_2.extend([0] * meta_features_test_orig_2.shape[1])
+            else:
+                test_X_mse_2.extend([0] * n_components)
+            test_X_mse_2.extend([0] * 322) 
+            
+            ## Append to test_X dataframe
+            a_series = pd.Series(test_X_mse_2)
+            test_X_mse = test_X_mse.append(a_series, ignore_index=True)
+            
+
+            test_Y_mse_2.extend(results_vec_mse_2)
+            
+            a_series = pd.Series(test_Y_mse_2)
+            test_Y_mse = test_Y_mse.append(a_series, ignore_index=True)
+         
+            ## Predict the second window performances
+            print(test_X_mse_2)
+            #test_X_mse_2 = np.array(test_X_mse_2)
+            #test_X_mse_2 = np.reshape(test_X_mse_2, (test_X_mse_2.shape[0], test_X_mse_2.shape[1], 1))                                  
+            
+            #predicted_win_2 = model_ts_mse.predict([test_X_mse_2])
+            #a_series = pd.Series(predicted_win_2[0])
+            #predicted_mse = predicted_mse.append(a_series, ignore_index=True)
+            
+            
+            ## Third Window History features and performances
+            test_X_mse_3.extend(meta_features_test.iloc[j,:])
+            #test_X_mse_3.extend(predicted_win_1[0]) Predict everything from scratch
+            test_X_mse_3.extend(results_vec_mse_1)
+            test_X_mse_3.extend(meta_features_test.iloc[j+ len(test_folds_list_mv[i]),:])
+            test_X_mse_3.extend(results_vec_mse_2)
+            #test_X_mse_3.extend(predicted_win_2[0])
+        
+            ## Appending the third raw to the test_X dataframe            
+            a_series = pd.Series(test_X_mse_3)
+            test_X_mse = test_X_mse.append(a_series, ignore_index=True)
+            print(test_X_mse)
+            
+            
+            ## Predicting Third window performances using time-series regression model
+            #test_X_mse_3 = np.array(test_X_mse_3)
+            #test_X_mse_3 = np.reshape(test_X_mse_3, (test_X_mse_3.shape[0], test_X_mse_3.shape[1], 1))
+            
+            #predicted_win_3 = model_ts_mse.predict([test_X_mse_3])
+            #a_series = pd.Series(predicted_win_3[0])
+            #predicted_mse = predicted_mse.append(a_series, ignore_index=True)
+            
+            
+            
+            ## Appending the third raw to the test_Y dataframe 
+            test_Y_mse_3.extend(results_vec_mse_3)
+            
+            a_series = pd.Series(test_Y_mse_3)
+            test_Y_mse = test_Y_mse.append(a_series, ignore_index=True)
+            print(test_Y_mse)
+        
+        #print('Test Features')
+        #print(test_X_mse)
+        
+        test_X_mse = test_X_mse.fillna(0) #train_X_mse.mean()
+        test_Y_mse = test_Y_mse.fillna(0.01) #train_Y_mse.mean()
+        
+        test_X_mse = np.array(test_X_mse)
+        test_X_mse = np.reshape(test_X_mse, (test_X_mse.shape[0], test_X_mse.shape[1], 1))
+        
+        
+        
+        predicted_win = model_ts_mse.predict(test_X_mse)
+        print(predicted_win)
+        print(predicted_win.shape)
+        print(predicted_win[0])
+        a_series = pd.Series(predicted_win[0])
+        predicted_mse = predicted_mse.append(a_series, ignore_index=True)
+        print(predicted_mse)
+        
+        
+        
+        ## Get the best model index from Autoforecast time-series meta-learner 
+        predicted_mse['MinColumnID']= predicted_mse.idxmin(axis=1)
+        test_Y_mse['MinColumnID']= test_Y_mse.idxmin(axis=1)
+        
+      
+        
+        print('Predicted ........')
+        #print(predicted_mse)
+        #predicted_mse.to_csv('Predicted_MSE_Fold_No_' + str(i) + '.csv') 
+      
+        print('Actual..........')
+        #print(test_Y_mse)
+        #test_Y_mse.to_csv('Actual_MSE_Fold_No_' + str(i) + '.csv') 
+
+        
+        ## Inference by getting the actual performance of the chosen model index by the time-series regression (i.e., the one with the least predicted output)
+        K = 1
+        a_vec = []
+        cnt = 0
+        for j in range(0, len(test_Y_mse)):
+            res = sorted(range(len(test_Y_mse.iloc[j,:-1])), key = lambda sub: test_Y_mse.iloc[j,:-1][sub])[:K]
+            #print(test_Y_mse.iloc[j,-1])
+            print(res)
+            print(np.argmin(predicted_win[j]))
+            if np.argmin(predicted_win[j]) in res: #np.argmin(predicted_win[j]):
+                cnt += 1
+                #print(cnt)
+            final_vec_all_folds.append(test_Y_mse.iloc[j,np.argmin(predicted_win[j])]) #predicted_mse.iloc[j,-1]])
+            print(cnt)
+            
+        print('Fold No. ' + str(i))
+        
+        cnt_k_all += cnt
+        print('Count-k: ' + str(cnt_k_all))
+        print('Rank-k-Acc: ' + str((cnt_k_all / (len(test_Y_mse) * n_folds))))
+        
+        '''
+        print(len(test_Y_mse))
+        a_vec = []
+        for j in range(0, len(test_Y_mse)):
+            final_vec_all_folds.append(test_Y_mse.iloc[j,np.argmin(predicted_win[j])]) #predicted_mse.iloc[j,-1]])
+        
+        print('Fold No. ' + str(i))
+        print(final_vec_all_folds)    
+        
+        ## Estimate Inference Time
+        AF_best_inference_run_time_seconds = time.time() - start_time 
+        print('AutoForecast Inference Time: '+ str(AF_best_inference_run_time_seconds))
+        '''
+    
+    #cnt = 0 
+    #for k in range(0,len(test_Y_mse)-1):
+    #    print(k)
+    #    if predicted_mse.iloc[k,-1] == test_Y_mse.iloc[k,-1]:
+    #        cnt += 1
+    
+    #print('top 1 Acc: '+ str(cnt))
+     
+        
+    #print('Performance Vector after all folds for time-series regression')
+        
+    #print(final_vec_all_folds)
+    #print(Average_val(final_vec_all_folds))    
+            
+        #break    
+            
+            #break
+        
+        
+
+
+
